@@ -22,7 +22,9 @@ h1{font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-3px;margin:15
 .hero-card,.card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}.hero-card{padding:22px}.eyebrow{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--cyan);font-weight:900}h2{font-size:26px;letter-spacing:-1px;margin:4px 0 7px}.muted{color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:16px}.stat{background:var(--soft);padding:13px;border-radius:15px}.stat strong{display:block;font-size:18px}.stat small{font-size:10px;color:var(--muted)}
 main{padding:18px 0 80px}.section{margin:28px 0}.head{margin-bottom:14px}.head p{margin:2px 0;color:var(--muted);font-size:13px}
-.card{padding:21px}.search{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field label{display:block;font-size:10px;font-weight:900;margin-bottom:6px}.input{width:100%;padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--bg);color:var(--ink);outline:none}
+.card{padding:21px}.search{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.field{position:relative}.field label{display:block;font-size:10px;font-weight:900;margin-bottom:6px}.input{width:100%;padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--bg);color:var(--ink);outline:none}
+.suggest{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);z-index:30;max-height:220px;overflow-y:auto;display:none}
+.suggest.open{display:block}.suggest-item{padding:11px 13px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}.suggest-item:last-child{border-bottom:none}.suggest-item:hover,.suggest-item:active{background:var(--soft)}.suggest-item b{color:var(--cyan)}.suggest-item small{display:block;color:var(--muted);font-size:11px}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}.chip{border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:99px;padding:8px 11px;font-size:11px;font-weight:800;cursor:pointer}.notice{font-size:11px;color:var(--muted);border-left:3px solid var(--cyan);padding-left:9px;margin-top:12px}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.tool{min-height:175px}.tool-icon{font-size:24px}.tool h3{margin:9px 0 4px}.tool p{font-size:12px;color:var(--muted);margin:0 0 13px}.result{margin-top:10px;padding:10px;border-radius:12px;background:var(--soft);border:1px solid var(--line);font-size:12px}
 .partners{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.partner{padding:17px;border-radius:18px;background:var(--soft);border:1px solid var(--line)}.partner h3{margin:0 0 5px}.partner p{font-size:12px;color:var(--muted);margin:0 0 12px}.full{width:100%}
@@ -49,8 +51,9 @@ footer{border-top:1px solid var(--line);padding:28px 0 90px;color:var(--muted);f
 </div></section>
 <main class="container">
 <section class="section" id="search"><div class="head"><div class="eyebrow">Flight Search</div><h2>Find & compare flights</h2><p>Open the live partner search for current fares and availability.</p></div>
-<div class="card"><div class="search"><div class="field"><label>FROM</label><input id="from" class="input" value="New York (JFK)" placeholder="City or airport"></div>
-<div class="field"><label>TO</label><input id="to" class="input" value="London (LHR)" placeholder="City or airport"></div>
+<div class="card"><div class="search">
+<div class="field"><label>FROM</label><input id="from" class="input" value="New York (JFK)" placeholder="City or airport" autocomplete="off"><div class="suggest" id="fromSuggest"></div></div>
+<div class="field"><label>TO</label><input id="to" class="input" value="London (LHR)" placeholder="City or airport" autocomplete="off"><div class="suggest" id="toSuggest"></div></div>
 <div class="field"><label>DEPART</label><input id="departureDate" class="input" type="date"></div>
 <button class="btn primary" id="searchBtn" onclick="searchFlights()">Search live fares →</button></div>
 <div class="chips"><button class="chip" onclick="route('New York (JFK)','London (LHR)')">🇺🇸 New York → London</button><button class="chip" onclick="route('Los Angeles (LAX)','Paris (CDG)')">🇺🇸 Los Angeles → Paris</button><button class="chip" onclick="route('Toronto (YYZ)','Dubai (DXB)')">🇨🇦 Toronto → Dubai</button><button class="chip" onclick="route('Lagos (LOS)','New York (JFK)')">🇳🇬 Lagos → New York</button></div>
@@ -92,7 +95,62 @@ function weather(){const c=prompt('Destination city?','London');if(c)document.ge
 function plan(){const c=prompt('Destination city?','London');if(!c)return;const d=Math.max(1,Math.min(14,Number(prompt('How many days?','5'))||5));let s='<div class="result"><b>'+d+'-day outline for '+c+'</b><br><br>';for(let i=1;i<=d;i++)s+='Day '+i+': '+(i===1?'Arrival and light exploration':i===d?'Final activities and departure preparation':'Key sights + flexible time')+'<br>';document.getElementById('planResult').innerHTML=s+'</div>'}
 function note(){const n=prompt('Travel note?');if(n){localStorage.setItem('fm_note',n);alert('Saved locally on this device.')}}
 
-// ---- Live flight search (Duffel via FlyMatrix backend) ----
+// ---- Airport autocomplete ----
+const AIRPORTS=[
+{c:"New York",code:"JFK",country:"US"},{c:"Los Angeles",code:"LAX",country:"US"},{c:"Chicago",code:"ORD",country:"US"},
+{c:"San Francisco",code:"SFO",country:"US"},{c:"Miami",code:"MIA",country:"US"},{c:"Atlanta",code:"ATL",country:"US"},
+{c:"Boston",code:"BOS",country:"US"},{c:"Dallas",code:"DFW",country:"US"},{c:"Houston",code:"IAH",country:"US"},
+{c:"Seattle",code:"SEA",country:"US"},{c:"Washington",code:"IAD",country:"US"},{c:"Las Vegas",code:"LAS",country:"US"},
+{c:"London",code:"LHR",country:"UK"},{c:"Manchester",code:"MAN",country:"UK"},{c:"Paris",code:"CDG",country:"FR"},
+{c:"Amsterdam",code:"AMS",country:"NL"},{c:"Frankfurt",code:"FRA",country:"DE"},{c:"Berlin",code:"BER",country:"DE"},
+{c:"Madrid",code:"MAD",country:"ES"},{c:"Barcelona",code:"BCN",country:"ES"},{c:"Rome",code:"FCO",country:"IT"},
+{c:"Milan",code:"MXP",country:"IT"},{c:"Zurich",code:"ZRH",country:"CH"},{c:"Vienna",code:"VIE",country:"AT"},
+{c:"Dublin",code:"DUB",country:"IE"},{c:"Lisbon",code:"LIS",country:"PT"},{c:"Istanbul",code:"IST",country:"TR"},
+{c:"Moscow",code:"SVO",country:"RU"},{c:"Dubai",code:"DXB",country:"AE"},{c:"Abu Dhabi",code:"AUH",country:"AE"},
+{c:"Doha",code:"DOH",country:"QA"},{c:"Riyadh",code:"RUH",country:"SA"},{c:"Jeddah",code:"JED",country:"SA"},
+{c:"Cairo",code:"CAI",country:"EG"},{c:"Casablanca",code:"CMN",country:"MA"},{c:"Nairobi",code:"NBO",country:"KE"},
+{c:"Addis Ababa",code:"ADD",country:"ET"},{c:"Accra",code:"ACC",country:"GH"},{c:"Johannesburg",code:"JNB",country:"ZA"},
+{c:"Cape Town",code:"CPT",country:"ZA"},{c:"Lagos",code:"LOS",country:"NG"},{c:"Abuja",code:"ABV",country:"NG"},
+{c:"Kano",code:"KAN",country:"NG"},{c:"Port Harcourt",code:"PHC",country:"NG"},{c:"Toronto",code:"YYZ",country:"CA"},
+{c:"Vancouver",code:"YVR",country:"CA"},{c:"Montreal",code:"YUL",country:"CA"},{c:"Mexico City",code:"MEX",country:"MX"},
+{c:"Sao Paulo",code:"GRU",country:"BR"},{c:"Rio de Janeiro",code:"GIG",country:"BR"},{c:"Buenos Aires",code:"EZE",country:"AR"},
+{c:"Bogota",code:"BOG",country:"CO"},{c:"Lima",code:"LIM",country:"PE"},{c:"Tokyo",code:"NRT",country:"JP"},
+{c:"Osaka",code:"KIX",country:"JP"},{c:"Seoul",code:"ICN",country:"KR"},{c:"Beijing",code:"PEK",country:"CN"},
+{c:"Shanghai",code:"PVG",country:"CN"},{c:"Hong Kong",code:"HKG",country:"HK"},{c:"Singapore",code:"SIN",country:"SG"},
+{c:"Bangkok",code:"BKK",country:"TH"},{c:"Kuala Lumpur",code:"KUL",country:"MY"},{c:"Jakarta",code:"CGK",country:"ID"},
+{c:"Manila",code:"MNL",country:"PH"},{c:"Delhi",code:"DEL",country:"IN"},{c:"Mumbai",code:"BOM",country:"IN"},
+{c:"Sydney",code:"SYD",country:"AU"},{c:"Melbourne",code:"MEL",country:"AU"},{c:"Auckland",code:"AKL",country:"NZ"}
+];
+
+function attachAutocomplete(inputId,listId){
+  const input=document.getElementById(inputId);
+  const list=document.getElementById(listId);
+
+  input.addEventListener('input',()=>{
+    const q=input.value.trim().toLowerCase();
+    if(q.length<2){list.classList.remove('open');list.innerHTML='';return}
+    const matches=AIRPORTS.filter(a=>a.c.toLowerCase().includes(q)||a.code.toLowerCase()===q).slice(0,8);
+    if(!matches.length){list.classList.remove('open');list.innerHTML='';return}
+    list.innerHTML=matches.map(a=>'<div class="suggest-item" data-value="'+a.c+' ('+a.code+')"><b>'+a.code+'</b> — '+a.c+'<small>'+a.country+'</small></div>').join('');
+    list.classList.add('open');
+  });
+
+  list.addEventListener('click',(e)=>{
+    const item=e.target.closest('.suggest-item');
+    if(!item)return;
+    input.value=item.dataset.value;
+    list.classList.remove('open');
+    list.innerHTML='';
+  });
+
+  input.addEventListener('blur',()=>{
+    setTimeout(()=>{list.classList.remove('open')},150);
+  });
+}
+attachAutocomplete('from','fromSuggest');
+attachAutocomplete('to','toSuggest');
+
+// ---- Live flight search (Duffel/Travelpayouts via FlyMatrix backend) ----
 function extractIata(value){
   const m=String(value||'').match(/\(([A-Za-z]{3})\)/);
   return m?m[1].toUpperCase():null;
@@ -112,7 +170,7 @@ async function searchFlights(){
   const box=document.getElementById('flightResults');
 
   if(!origin||!destination){
-    alert('Please use the airport code shown in parentheses, e.g. "London (LHR)", or tap a suggested route below.');
+    alert('Please use the airport code shown in parentheses, e.g. "London (LHR)", or pick a suggestion from the dropdown.');
     return;
   }
   if(!departureDate){
@@ -150,7 +208,6 @@ async function searchFlights(){
       return '<div class="result"><b>'+airline+'</b> — '+price+'<br>'+stops+'</div>';
     }).join('');
 
-    // Append a single monetized booking CTA for this search.
     resolveBookingLink('flights').then(link=>{
       if(link){
         box.innerHTML+='<a class="btn primary full" style="margin-top:10px" href="'+link+'" target="_blank" rel="noopener">Continue to booking partner →</a>';
@@ -165,7 +222,6 @@ async function searchFlights(){
   }
 }
 
-// ---- Affiliate/booking link resolution ----
 async function resolveBookingLink(category){
   try{
     const res=await fetch(`${API_BASE}/api/booking/resolve?category=${category}&market=GLOBAL`);
@@ -173,7 +229,7 @@ async function resolveBookingLink(category){
     if(data.success&&data.selected&&data.selected.id){
       return `${API_BASE}/go/affiliate/${data.selected.id}`;
     }
-  }catch(err){/* keep existing fallback link */}
+  }catch(err){}
   return null;
 }
 
@@ -188,7 +244,6 @@ async function wireAffiliateLinks(){
 }
 document.addEventListener('DOMContentLoaded',wireAffiliateLinks);
 
-// ---- VIP fare alerts ----
 async function vip(){
   const emailEl=document.getElementById('email');
   const e=emailEl.value.trim();
@@ -206,7 +261,7 @@ async function vip(){
     });
     const data=await res.json();
     if(data.success){
-      alert('You’re subscribed! We’ll track this route and let you know about fare drops.');
+      alert('You\'re subscribed! We\'ll track this route and let you know about fare drops.');
       emailEl.value='';
     }else{
       alert(data.error||'Something went wrong. Please try again.');
