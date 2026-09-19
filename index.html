@@ -56,7 +56,7 @@ footer{border-top:1px solid var(--line);padding:28px 0 90px;color:var(--muted);f
 <div class="field"><label>TO</label><input id="to" class="input" value="London (LHR)" placeholder="City or airport" autocomplete="off"><div class="suggest" id="toSuggest"></div></div>
 <div class="field"><label>DEPART</label><input id="departureDate" class="input" type="date"></div>
 <button class="btn primary" id="searchBtn" onclick="searchFlights()">Search live fares →</button></div>
-<div class="chips"><button class="chip" onclick="route('New York (JFK)','London (LHR)')">🇺🇸 New York → London</button><button class="chip" onclick="route('Los Angeles (LAX)','Paris (CDG)')">🇺🇸 Los Angeles → Paris</button><button class="chip" onclick="route('Toronto (YYZ)','Dubai (DXB)')">🇨🇦 Toronto → Dubai</button><button class="chip" onclick="route('Lagos (LOS)','New York (JFK)')">🇳🇬 Lagos → New York</button></div>
+<div class="chips" id="quickRoutes"><button class="chip" onclick="route('New York (JFK)','London (LHR)')">🇺🇸 New York → London</button><button class="chip" onclick="route('Los Angeles (LAX)','Paris (CDG)')">🇺🇸 Los Angeles → Paris</button><button class="chip" onclick="route('Toronto (YYZ)','Dubai (DXB)')">🇨🇦 Toronto → Dubai</button><button class="chip" onclick="route('Lagos (LOS)','New York (JFK)')">🇳🇬 Lagos → New York</button></div>
 <div id="flightResults"></div>
 <div class="notice">Live fares and availability can change. Confirm final price, baggage rules and booking conditions before payment.</div></div></section>
 <section class="section" id="intelligence"><div class="head"><div class="eyebrow">Travel Intelligence</div><h2>Prepare before you fly</h2><p>Decision-support tools without false guarantees.</p></div>
@@ -95,13 +95,13 @@ function weather(){const c=prompt('Destination city?','London');if(c)document.ge
 function plan(){const c=prompt('Destination city?','London');if(!c)return;const d=Math.max(1,Math.min(14,Number(prompt('How many days?','5'))||5));let s='<div class="result"><b>'+d+'-day outline for '+c+'</b><br><br>';for(let i=1;i<=d;i++)s+='Day '+i+': '+(i===1?'Arrival and light exploration':i===d?'Final activities and departure preparation':'Key sights + flexible time')+'<br>';document.getElementById('planResult').innerHTML=s+'</div>'}
 function note(){const n=prompt('Travel note?');if(n){localStorage.setItem('fm_note',n);alert('Saved locally on this device.')}}
 
-// ---- Airport autocomplete ----
+// ---- Airport data (used for autocomplete + popular-route labels) ----
 const AIRPORTS=[
 {c:"New York",code:"JFK",country:"US"},{c:"Los Angeles",code:"LAX",country:"US"},{c:"Chicago",code:"ORD",country:"US"},
 {c:"San Francisco",code:"SFO",country:"US"},{c:"Miami",code:"MIA",country:"US"},{c:"Atlanta",code:"ATL",country:"US"},
 {c:"Boston",code:"BOS",country:"US"},{c:"Dallas",code:"DFW",country:"US"},{c:"Houston",code:"IAH",country:"US"},
 {c:"Seattle",code:"SEA",country:"US"},{c:"Washington",code:"IAD",country:"US"},{c:"Las Vegas",code:"LAS",country:"US"},
-{c:"London",code:"LHR",country:"UK"},{c:"Manchester",code:"MAN",country:"UK"},{c:"Paris",code:"CDG",country:"FR"},
+{c:"London",code:"LHR",country:"GB"},{c:"Manchester",code:"MAN",country:"GB"},{c:"Paris",code:"CDG",country:"FR"},
 {c:"Amsterdam",code:"AMS",country:"NL"},{c:"Frankfurt",code:"FRA",country:"DE"},{c:"Berlin",code:"BER",country:"DE"},
 {c:"Madrid",code:"MAD",country:"ES"},{c:"Barcelona",code:"BCN",country:"ES"},{c:"Rome",code:"FCO",country:"IT"},
 {c:"Milan",code:"MXP",country:"IT"},{c:"Zurich",code:"ZRH",country:"CH"},{c:"Vienna",code:"VIE",country:"AT"},
@@ -121,6 +121,14 @@ const AIRPORTS=[
 {c:"Manila",code:"MNL",country:"PH"},{c:"Delhi",code:"DEL",country:"IN"},{c:"Mumbai",code:"BOM",country:"IN"},
 {c:"Sydney",code:"SYD",country:"AU"},{c:"Melbourne",code:"MEL",country:"AU"},{c:"Auckland",code:"AKL",country:"NZ"}
 ];
+const AIRPORTS_BY_CODE={};
+AIRPORTS.forEach(a=>{AIRPORTS_BY_CODE[a.code]=a});
+
+function flagEmoji(iso2){
+  if(!iso2||iso2.length!==2)return '🌐';
+  const codePoints=[...iso2.toUpperCase()].map(ch=>127397+ch.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
 
 function attachAutocomplete(inputId,listId){
   const input=document.getElementById(inputId);
@@ -149,6 +157,28 @@ function attachAutocomplete(inputId,listId){
 }
 attachAutocomplete('from','fromSuggest');
 attachAutocomplete('to','toSuggest');
+
+// ---- Popular routes (real search data from the backend, with a
+// built-in fallback if there isn't enough data yet or the fetch fails) ----
+async function loadPopularRoutes(){
+  const box=document.getElementById('quickRoutes');
+  try{
+    const res=await fetch(`${API_BASE}/api/popular-routes?limit=4`);
+    const data=await res.json();
+    if(!data.success||!Array.isArray(data.routes)||!data.routes.length)return;
+
+    box.innerHTML=data.routes.map(r=>{
+      const originInfo=AIRPORTS_BY_CODE[r.origin];
+      const destInfo=AIRPORTS_BY_CODE[r.destination];
+      const originLabel=originInfo?originInfo.c+' ('+r.origin+')':r.origin;
+      const destLabel=destInfo?destInfo.c+' ('+r.destination+')':r.destination;
+      const flag=flagEmoji(originInfo?originInfo.country:null);
+      return '<button class="chip" onclick="route(\''+originLabel+'\',\''+destLabel+'\')">'+flag+' '+(originInfo?originInfo.c:r.origin)+' → '+(destInfo?destInfo.c:r.destination)+'</button>';
+    }).join('');
+  }catch(err){
+    // Leave the static fallback chips already in the HTML untouched.
+  }
+}
 
 // ---- Live flight search (Duffel/Travelpayouts via FlyMatrix backend) ----
 function extractIata(value){
@@ -243,6 +273,7 @@ async function wireAffiliateLinks(){
   }
 }
 document.addEventListener('DOMContentLoaded',wireAffiliateLinks);
+document.addEventListener('DOMContentLoaded',loadPopularRoutes);
 
 async function vip(){
   const emailEl=document.getElementById('email');
